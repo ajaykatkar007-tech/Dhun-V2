@@ -1,0 +1,157 @@
+<resources>
+    <string name="app_name">Dhun</string>
+    <string name="app_tagline">Your Music. Your Dhun.</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_library">Library</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Home Screen -->
+    <string name="greeting_morning">Good Morning</string>
+    <string name="greeting_afternoon">Good Afternoon</string>
+    <string name="greeting_evening">Good Evening</string>
+    <string name="greeting_night">Good Night</string>
+    <string name="home_subtitle">Your music, your vibe.</string>
+    <string name="quick_liked_songs">Liked Songs</string>
+    <string name="quick_recently_played">Recently Played</string>
+    <string name="quick_all_songs">All Songs</string>
+    <string name="quick_playlists">Playlists</string>
+    <string name="section_continue_listening">Continue Listening</string>
+    <string name="section_recently_added">Recently Added</string>
+    <string name="section_mood_shortcuts">Mood &amp; Vibes</string>
+    <string name="mood_late_night">Late Night</string>
+    <string name="mood_energy">Energy</string>
+    <string name="mood_chill">Chill</string>
+    <string name="mood_favorites">Favorites</string>
+    <string name="see_all">See All</string>
+
+    <!-- Search Screen -->
+    <string name="search_placeholder">Search songs, artists, albums, folders…</string>
+    <string name="recent_searches">Recent Searches</string>
+    <string name="clear_search_history">Clear</string>
+    <string name="browse_categories">Browse Categories</string>
+    <string name="category_bollywood">Bollywood &amp; Filmi</string>
+    <string name="category_classical">Indian Classical</string>
+    <string name="category_acoustic">Acoustic &amp; Sufi</string>
+    <string name="category_lofi">Chillhop &amp; Lofi</string>
+    <string name="category_dance">Bhangra &amp; Dance</string>
+    <string name="category_devotional">Devotional &amp; Spiritual</string>
+    <string name="no_search_results">No results found for \"%1$s\"</string>
+    <string name="try_different_keyword">Try searching by title, artist, or album</string>
+
+    <!-- Library Screen -->
+    <string name="tab_songs">Songs</string>
+    <string name="tab_albums">Albums</string>
+    <string name="tab_artists">Artists</string>
+    <string name="tab_playlists">Playlists</string>
+    <string name="tab_folders">Folders</string>
+    <string name="sort_by">Sort by</string>
+    <string name="sort_title">Title (A-Z)</string>
+    <string name="sort_artist">Artist</string>
+    <string name="sort_date_added">Recently Added</string>
+    <string name="sort_duration">Duration</string>
+    <string name="scan_music_button">Scan Local Music</string>
+    <string name="scanning_progress">Scanning local audio…</string>
+
+    <!-- Playlists -->
+    <string name="new_playlist">New Playlist</string>
+    <string name="create_playlist_title">Create Playlist</string>
+    <string name="playlist_name_hint">Enter playlist name</string>
+    <string name="rename_playlist">Rename Playlist</string>
+    <string name="delete_playlist">Delete Playlist</string>
+    <string name="create">Create</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="songs_count_format">%1$d songs • %2$s</string>
+    <string name="play_all">Play</string>
+    <string name="shuffle_all">Shuffle</string>
+
+    <!-- Now Playing & Mini Player -->
+    <string name="now_playing">Now Playing</string>
+    <string name="playing_queue">Playing Queue</string>
+    <string name="clear_queue">Clear Queue</string>
+    <string name="add_to_queue">Add to Queue</string>
+    <string name="play_next">Play Next</string>
+    <string name="add_to_playlist">Add to Playlist</string>
+    <string name="song_details">Song Details</string>
+    <string name="share_song">Share Audio File</string>
+    <string name="unknown_artist">Unknown Artist</string>
+    <string name="unknown_album">Unknown Album</string>
+    <string name="no_song_playing">No track playing</string>
+    <string name="select_song_to_play">Select any song to begin listening</string>
+
+    <!-- Settings -->
+    <string name="settings_playback_title">Playback</string>
+    <string name="setting_audio_quality">Audio Output</string>
+    <string name="setting_audio_quality_desc">Direct high-res audio engine</string>
+    <string name="setting_crossfade">Audio Crossfade</string>
+    <string name="setting_crossfade_desc">Smooth cross-track transitions</string>
+    <string name="setting_sleep_timer">Sleep Timer</string>
+    <string name="setting_sleep_timer_desc">Turn off playback automatically</string>
+    <string name="sleep_timer_off">Off</string>
+    <string name="sleep_timer_minutes">%1$d minutes</string>
+
+    <string name="settings_library_title">Library</string>
+    <string name="setting_rescan">Rescan Music Library</string>
+    <string name="setting_rescan_desc">Scan device for newly added audio tracks</string>
+    <string name="setting_filter_short">Filter Short Audio</string>
+    <string name="setting_filter_short_desc">Ignore recordings and ringtones under 30 seconds</string>
+    <string name="setting_included_folders">Included Folders</string>
+    <string name="setting_included_folders_desc">Storage directories being indexed</string>
+
+    <string name="settings_appearance_title">Appearance</string>
+    <string name="setting_theme">Theme</string>
+    <string name="setting_theme_desc">Deep Midnight Black (AMOLED)</string>
+    <string name="setting_accent">Accent Color</string>
+    <string name="setting_accent_desc">Royal Purple &amp; Fuchsia Pink</string>
+
+    <string name="settings_about_title">About</string>
+    <string name="setting_version">Version</string>
+    <string name="setting_version_value">1.0.0</string>
+    <string name="setting_privacy">Privacy &amp; Local Guarantee</string>
+    <string name="setting_privacy_desc">100% offline. No analytics, tracking or uploads.</string>
+    <string name="setting_feedback">Feedback &amp; Craft</string>
+    <string name="setting_feedback_desc">Built with pride for local music lovers</string>
+
+    <!-- Empty States -->
+    <string name="empty_music_title">No music found</string>
+    <string name="empty_music_desc">Your music will appear here after scanning your device.</string>
+    <string name="empty_playlists_title">No playlists yet</string>
+    <string name="empty_playlists_desc">Create your first custom playlist to group your favorites.</string>
+    <string name="empty_favorites_title">No favorites yet</string>
+    <string name="empty_favorites_desc">Songs you like will appear here for quick access.</string>
+    <string name="empty_recent_title">Nothing played recently</string>
+    <string name="empty_recent_desc">Start playing any melody to see your listening history.</string>
+    <string name="empty_queue_title">Queue is empty</string>
+    <string name="empty_queue_desc">Add songs to your playing queue from any screen.</string>
+
+    <!-- Permissions -->
+    <string name="permission_audio_title">Storage &amp; Audio Permission</string>
+    <string name="permission_audio_desc">Dhun needs access to your device audio files to build your local offline library.</string>
+    <string name="grant_permission">Grant Permission</string>
+    <string name="load_sample_tracks">Sample Dhun Tunes</string>
+
+    <!-- Additional Screen Strings -->
+    <string name="library_title">Library</string>
+    <string name="empty_library_title">No music found</string>
+    <string name="empty_library_desc">Your music will appear here after scanning your device.</string>
+    <string name="create_playlist">Create Playlist</string>
+    <string name="now_playing_header">NOW PLAYING</string>
+    <string name="queue_title">Playing Queue</string>
+    <string name="search_title">Search</string>
+    <string name="search_hint">Search songs, artists, albums, folders…</string>
+    <string name="search_categories">Browse Categories</string>
+    <string name="search_no_results_title">No matches found</string>
+    <string name="search_no_results_desc">Try searching by a different song title, artist, or album.</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_playback">Playback</string>
+    <string name="settings_sleep_timer">Sleep Timer</string>
+    <string name="settings_section_library">Library</string>
+    <string name="settings_rescan_library">Rescan Library</string>
+    <string name="settings_filter_short_audio">Filter Short Audio</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_version_info">Version 1.0.0 • Offline Local Music Player</string>
+</resources>
