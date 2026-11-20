@@ -10,23 +10,43 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.AudioManager
+import android.media.MediaMetadata
+import android.media.session.MediaSession
+import android.media.session.PlaybackState
+import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import com.dhun.music.MainActivity
 import com.dhun.music.R
+import com.dhun.music.model.PlaybackInfo
+import com.dhun.music.model.PlayerStatus
 import com.dhun.music.model.Song
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 class DhunPlaybackService : Service() {
 
     private var isNoisyReceiverRegistered = false
+    private var mediaSession: MediaSession? = null
+    private var playbackObserver: Job? = null
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var lastNotificationKey: String? = null
 
     private val noisyReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
-                // Pause playback when headphones or Bluetooth audio device is disconnected
+                // Preserve the existing safety behavior when headphones disconnect.
                 AudioPlaybackManager.getInstance(applicationContext).pause()
             }
         }
@@ -38,11 +58,127 @@ class DhunPlaybackService : Service() {
         super.onCreate()
         createNotificationChannel()
         registerNoisyReceiver()
+        createMediaSession()
+        observePlayback()
     }
 
     override fun onDestroy() {
+        playbackObserver?.cancel()
+        serviceScope.cancel()
         unregisterNoisyReceiver()
+        mediaSession?.run {
+            isActive = false
+            release()
+        }
+        mediaSession = null
         super.onDestroy()
+    }
+
+    private fun createMediaSession() {
+        mediaSession = MediaSession(this, "DhunPlayback").apply {
+            setFlags(
+                MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or
+                    MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS
+            )
+            setCallback(object : MediaSession.Callback() {
+                override fun onPlay() {
+                    AudioPlaybackManager.getInstance(applicationContext).resume()
+                }
+
+                override fun onPause() {
+                    AudioPlaybackManager.getInstance(applicationContext).pause()
+                }
+
+                override fun onSkipToNext() {
+                    AudioPlaybackManager.getInstance(applicationContext).next()
+                }
+
+                override fun onSkipToPrevious() {
+                    AudioPlaybackManager.getInstance(applicationContext).previous()
+                }
+
+                override fun onSeekTo(pos: Long) {
+                    AudioPlaybackManager.getInstance(applicationContext).seekTo(pos)
+                }
+
+                override fun onStop() {
+                    AudioPlaybackManager.getInstance(applicationContext).clearQueue()
+                }
+            })
+            isActive = true
+        }
+    }
+
+    private fun observePlayback() {
+        playbackObserver = serviceScope.launch {
+            AudioPlaybackManager.getInstance(applicationContext).playbackInfo.collect { info ->
+                updateMediaSession(info)
+                val notificationKey = "${info.currentSong?.id}:${info.status}"
+                if (info.currentSong != null && notificationKey != lastNotificationKey) {
+                    lastNotificationKey = notificationKey
+                    updatePlaybackNotification(info)
+                } else if (info.currentSong == null) {
+                    lastNotificationKey = null
+                }
+            }
+        }
+    }
+
+    private fun updateMediaSession(info: PlaybackInfo) {
+        val session = mediaSession ?: return
+        val song = info.currentSong
+        if (song == null) {
+            session.setMetadata(null)
+            session.setPlaybackState(
+                PlaybackState.Builder()
+                    .setActions(PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PLAY_PAUSE)
+                    .setState(PlaybackState.STATE_NONE, 0L, 0f)
+                    .build()
+            )
+            return
+        }
+
+        val metadataBuilder = MediaMetadata.Builder()
+            .putString(MediaMetadata.METADATA_KEY_TITLE, song.title)
+            .putString(MediaMetadata.METADATA_KEY_ARTIST, song.artist)
+            .putString(MediaMetadata.METADATA_KEY_ALBUM, song.album)
+            .putLong(MediaMetadata.METADATA_KEY_DURATION, info.durationMs.takeIf { it > 0 } ?: song.durationMs)
+
+        loadArtwork(song.albumArtUri)?.let { artwork ->
+            metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, artwork)
+            metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ART, artwork)
+        }
+        session.setMetadata(metadataBuilder.build())
+
+        val actions = PlaybackState.ACTION_PLAY or
+            PlaybackState.ACTION_PAUSE or
+            PlaybackState.ACTION_PLAY_PAUSE or
+            PlaybackState.ACTION_SKIP_TO_NEXT or
+            PlaybackState.ACTION_SKIP_TO_PREVIOUS or
+            PlaybackState.ACTION_SEEK_TO or
+            PlaybackState.ACTION_STOP
+
+        val state = when (info.status) {
+            PlayerStatus.PLAYING -> PlaybackState.STATE_PLAYING
+            PlayerStatus.BUFFERING -> PlaybackState.STATE_BUFFERING
+            PlayerStatus.PAUSED -> PlaybackState.STATE_PAUSED
+            PlayerStatus.ERROR, PlayerStatus.IDLE -> PlaybackState.STATE_STOPPED
+        }
+        session.setPlaybackState(
+            PlaybackState.Builder()
+                .setActions(actions)
+                .setState(state, info.currentPositionMs.coerceAtLeast(0L), if (info.isPlaying) 1f else 0f)
+                .build()
+        )
+    }
+
+    private fun loadArtwork(artworkUri: String?): Bitmap? {
+        if (artworkUri.isNullOrBlank()) return null
+        return try {
+            contentResolver.openInputStream(Uri.parse(artworkUri))?.use(BitmapFactory::decodeStream)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun registerNoisyReceiver() {
@@ -57,18 +193,17 @@ class DhunPlaybackService : Service() {
         if (isNoisyReceiverRegistered) {
             try {
                 unregisterReceiver(noisyReceiver)
-            } catch (e: Exception) {
-                // Ignore
+            } catch (_: Exception) {
+                // Receiver may already have been unregistered by the system.
             }
             isNoisyReceiverRegistered = false
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val action = intent?.action
         val playbackManager = AudioPlaybackManager.getInstance(applicationContext)
 
-        when (action) {
+        when (intent?.action) {
             ACTION_PLAY -> playbackManager.resume()
             ACTION_PAUSE -> playbackManager.pause()
             ACTION_NEXT -> playbackManager.next()
@@ -80,10 +215,12 @@ class DhunPlaybackService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_UPDATE -> {
-                val title = intent.getStringExtra(EXTRA_TITLE) ?: "Dhun"
-                val artist = intent.getStringExtra(EXTRA_ARTIST) ?: "Playing Music"
-                val isPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, false)
-
+                val info = playbackManager.playbackInfo.value
+                val song = info.currentSong
+                val title = song?.title ?: intent.getStringExtra(EXTRA_TITLE) ?: "Dhun"
+                val artist = song?.artist ?: intent.getStringExtra(EXTRA_ARTIST) ?: "Playing Music"
+                val isPlaying = info.currentSong?.let { info.isPlaying }
+                    ?: intent.getBooleanExtra(EXTRA_IS_PLAYING, false)
                 val notification = buildNotification(title, artist, isPlaying)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     ServiceCompat.startForeground(
@@ -97,8 +234,13 @@ class DhunPlaybackService : Service() {
                 }
             }
         }
-
         return START_STICKY
+    }
+
+    private fun updatePlaybackNotification(info: PlaybackInfo) {
+        val song = info.currentSong ?: return
+        val notification = buildNotification(song.title, song.artist, info.isPlaying)
+        NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, notification)
     }
 
     private fun buildNotification(title: String, artist: String, isPlaying: Boolean): Notification {
@@ -106,43 +248,26 @@ class DhunPlaybackService : Service() {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val contentPendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            openAppIntent,
+            this, 0, openAppIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val prevIntent = Intent(this, DhunPlaybackService::class.java).apply { action = ACTION_PREV }
-        val prevPendingIntent = PendingIntent.getService(
-            this,
-            1,
-            prevIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val playPauseIntent = Intent(this, DhunPlaybackService::class.java).apply {
-            action = if (isPlaying) ACTION_PAUSE else ACTION_PLAY
+        fun servicePendingIntent(requestCode: Int, action: String): PendingIntent {
+            val actionIntent = Intent(this, DhunPlaybackService::class.java).apply { this.action = action }
+            return PendingIntent.getService(
+                this, requestCode, actionIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
         }
-        val playPausePendingIntent = PendingIntent.getService(
-            this,
-            2,
-            playPauseIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val nextIntent = Intent(this, DhunPlaybackService::class.java).apply { action = ACTION_NEXT }
-        val nextPendingIntent = PendingIntent.getService(
-            this,
-            3,
-            nextIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
 
         val playPauseIcon = if (isPlaying) {
             android.R.drawable.ic_media_pause
         } else {
             android.R.drawable.ic_media_play
         }
+        val style = NotificationCompat.MediaStyle()
+            .setMediaSession(mediaSession?.sessionToken)
+            .setShowActionsInCompactView(0, 1, 2)
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
@@ -152,9 +277,10 @@ class DhunPlaybackService : Service() {
             .setContentIntent(contentPendingIntent)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(isPlaying)
-            .addAction(android.R.drawable.ic_media_previous, "Previous", prevPendingIntent)
-            .addAction(playPauseIcon, if (isPlaying) "Pause" else "Play", playPausePendingIntent)
-            .addAction(android.R.drawable.ic_media_next, "Next", nextPendingIntent)
+            .addAction(android.R.drawable.ic_media_previous, "Previous", servicePendingIntent(1, ACTION_PREV))
+            .addAction(playPauseIcon, if (isPlaying) "Pause" else "Play", servicePendingIntent(2, if (isPlaying) ACTION_PAUSE else ACTION_PLAY))
+            .addAction(android.R.drawable.ic_media_next, "Next", servicePendingIntent(3, ACTION_NEXT))
+            .setStyle(style)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
@@ -169,8 +295,7 @@ class DhunPlaybackService : Service() {
                 description = "Controls and information for currently playing music"
                 setShowBadge(false)
             }
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
 
