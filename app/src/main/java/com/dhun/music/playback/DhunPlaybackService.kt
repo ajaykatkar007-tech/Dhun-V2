@@ -270,24 +270,28 @@ class DhunPlaybackService : Service() {
         } else {
             android.R.drawable.ic_media_play
         }
-        val style = NotificationCompat.MediaStyle()
+        val style = Notification.MediaStyle()
             .setMediaSession(mediaSession?.sessionToken)
             .setShowActionsInCompactView(0, 1, 2)
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = Notification.Builder(this)
             .setContentTitle(title)
             .setContentText(artist)
             .setSubText(getString(R.string.app_name))
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(contentPendingIntent)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOngoing(isPlaying)
             .addAction(android.R.drawable.ic_media_previous, "Previous", servicePendingIntent(1, ACTION_PREV))
             .addAction(playPauseIcon, if (isPlaying) "Pause" else "Play", servicePendingIntent(2, if (isPlaying) ACTION_PAUSE else ACTION_PLAY))
             .addAction(android.R.drawable.ic_media_next, "Next", servicePendingIntent(3, ACTION_NEXT))
             .setStyle(style)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
+            .setPriority(Notification.PRIORITY_LOW)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            builder.setChannelId(CHANNEL_ID)
+        }
+        return builder.build()
     }
 
     private fun createNotificationChannel() {
