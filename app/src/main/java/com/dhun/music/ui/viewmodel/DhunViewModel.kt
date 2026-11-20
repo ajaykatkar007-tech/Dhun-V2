@@ -129,11 +129,18 @@ class DhunViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
     }
 
     fun navigateBack(): Boolean {
-        if (_navigationStack.value.size <= 1) return false
-        _navigationStack.value = _navigationStack.value.dropLast(1)
-        persistNavigation()
-        syncLegacyNavigationState()
-        return true
+        if (_navigationStack.value.size > 1) {
+            _navigationStack.value = _navigationStack.value.dropLast(1)
+            persistNavigation()
+            syncLegacyNavigationState()
+            return true
+        }
+        val currentTab = _navigationStack.value.lastOrNull()?.tab ?: DhunNavTab.HOME
+        if (currentTab != DhunNavTab.HOME) {
+            selectTab(DhunNavTab.HOME)
+            return true
+        }
+        return false
     }
 
     init {
