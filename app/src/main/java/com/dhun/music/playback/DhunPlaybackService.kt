@@ -42,6 +42,7 @@ class DhunPlaybackService : Service() {
     private var playbackObserver: Job? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var lastNotificationKey: String? = null
+    private var lastMetadataSongId: Long? = null
 
     private val noisyReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -128,6 +129,7 @@ class DhunPlaybackService : Service() {
         val session = mediaSession ?: return
         val song = info.currentSong
         if (song == null) {
+            lastMetadataSongId = null
             session.setMetadata(null)
             session.setPlaybackState(
                 PlaybackState.Builder()
@@ -138,17 +140,20 @@ class DhunPlaybackService : Service() {
             return
         }
 
-        val metadataBuilder = MediaMetadata.Builder()
-            .putString(MediaMetadata.METADATA_KEY_TITLE, song.title)
-            .putString(MediaMetadata.METADATA_KEY_ARTIST, song.artist)
-            .putString(MediaMetadata.METADATA_KEY_ALBUM, song.album)
-            .putLong(MediaMetadata.METADATA_KEY_DURATION, info.durationMs.takeIf { it > 0 } ?: song.durationMs)
+        if (lastMetadataSongId != song.id) {
+            val metadataBuilder = MediaMetadata.Builder()
+                .putString(MediaMetadata.METADATA_KEY_TITLE, song.title)
+                .putString(MediaMetadata.METADATA_KEY_ARTIST, song.artist)
+                .putString(MediaMetadata.METADATA_KEY_ALBUM, song.album)
+                .putLong(MediaMetadata.METADATA_KEY_DURATION, info.durationMs.takeIf { it > 0 } ?: song.durationMs)
 
-        loadArtwork(song.albumArtUri)?.let { artwork ->
-            metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, artwork)
-            metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ART, artwork)
+            loadArtwork(song.albumArtUri)?.let { artwork ->
+                metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, artwork)
+                metadataBuilder.putBitmap(MediaMetadata.METADATA_KEY_ART, artwork)
+            }
+            session.setMetadata(metadataBuilder.build())
+            lastMetadataSongId = song.id
         }
-        session.setMetadata(metadataBuilder.build())
 
         val actions = PlaybackState.ACTION_PLAY or
             PlaybackState.ACTION_PAUSE or
@@ -175,7 +180,7 @@ class DhunPlaybackService : Service() {
     private fun loadArtwork(artworkUri: String?): Bitmap? {
         if (artworkUri.isNullOrBlank()) return null
         return try {
-            contentResolver.openInputStream(Uri.parse(artworkUri))?.use(BitmapFactory::decodeStream)
+            contentResolver.openInputStream(Uri.parse(artworkUri))?.use { BitmapFactory.decodeStream(it) }
         } catch (_: Exception) {
             null
         }
