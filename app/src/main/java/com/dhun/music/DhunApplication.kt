@@ -38,7 +38,9 @@ class DhunApplication : Application() {
             try {
                 val existingSongs = repository.allSongs.first()
                 if (existingSongs.isEmpty()) {
-                    repository.rescanMusic()
+                    val ignoreShortAudio = getSharedPreferences("dhun_settings", MODE_PRIVATE)
+                        .getBoolean("ignore_short_audio", true)
+                    repository.rescanMusic(ignoreShortAudio)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
