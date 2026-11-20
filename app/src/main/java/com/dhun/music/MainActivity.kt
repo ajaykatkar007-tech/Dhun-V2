@@ -129,6 +129,8 @@ fun DhunApp(viewModel: DhunViewModel) {
                 permissions[Manifest.permission.READ_EXTERNAL_STORAGE] == true
         if (audioGranted) {
             viewModel.rescanMusic()
+        } else {
+            viewModel.rescanMusic()
         }
     }
 
