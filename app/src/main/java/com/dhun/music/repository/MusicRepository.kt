@@ -15,6 +15,8 @@ import com.dhun.music.model.Song
 import com.dhun.music.scanner.MediaScanner
 import com.dhun.music.scanner.MusicScanReport
 import com.dhun.music.scanner.MusicScanResult
+import com.dhun.music.scanner.deduplicateScannedSongs
+import com.dhun.music.scanner.shouldReplaceLibrary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -132,13 +134,14 @@ class MusicRepository(
 
         when (scanResult) {
             is MusicScanResult.Success -> {
-                val unique = scanResult.songs.distinctBy { it.id }.distinctBy { it.contentUri }
+                if (!shouldReplaceLibrary(scanResult)) return@withContext MusicScanReport(MusicScanResult.Empty())
+                val unique = deduplicateScannedSongs(scanResult.songs)
                 if (unique.isEmpty()) return@withContext MusicScanReport(MusicScanResult.Empty())
                 dao.replaceScannedSongs(unique.map(::toEntity))
                 MusicScanReport(MusicScanResult.Success(unique), unique.count { it.id !in existingIds })
             }
             is MusicScanResult.PartialSuccess -> {
-                val unique = scanResult.songs.distinctBy { it.id }.distinctBy { it.contentUri }
+                val unique = deduplicateScannedSongs(scanResult.songs)
                 if (unique.isNotEmpty()) dao.insertSongs(unique.map(::toEntity))
                 MusicScanReport(
                     MusicScanResult.PartialSuccess(unique, scanResult.skippedCount),
