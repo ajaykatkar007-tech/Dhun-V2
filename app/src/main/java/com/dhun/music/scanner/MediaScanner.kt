@@ -92,7 +92,7 @@ object MediaScanner {
                         val isMp3 = mimeType.equals("audio/mpeg", ignoreCase = true) ||
                             extension == "mp3"
                         val isOtherSupportedAudio = mimeType?.startsWith("audio/", ignoreCase = true) == true ||
-                            extension in SUPPORTED_AUDIO_EXTENSIONS
+                            extension?.let { it in SUPPORTED_AUDIO_EXTENSIONS } == true
 
                         if (!isMp3 && !isOtherSupportedAudio) continue
 
@@ -153,6 +153,28 @@ object MediaScanner {
             uniqueSongs.isEmpty() -> MusicScanResult.Empty()
             skippedRows > 0 -> MusicScanResult.PartialSuccess(uniqueSongs, skippedRows)
             else -> MusicScanResult.Success(uniqueSongs)
+        }
+    }
+
+
+    suspend fun countDeviceAudioItems(context: Context): Int? = withContext(Dispatchers.IO) {
+        if (!hasAudioPermission(context)) return@withContext null
+        val collection = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
+        } else {
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        }
+        try {
+            val cursor = context.contentResolver.query(
+                collection,
+                arrayOf(MediaStore.Audio.Media._ID),
+                null,
+                null,
+                null
+            ) ?: return@withContext null
+            cursor.use { it.count }
+        } catch (_: Exception) {
+            null
         }
     }
 
