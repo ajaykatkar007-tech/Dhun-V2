@@ -14,7 +14,8 @@ class NavigationStackReducerTest {
         val playlist = NavigationStackReducer.openPlaylist(library, 42L)
         assertEquals(42L, playlist.last().playlistId)
         assertEquals(DhunNavTab.LIBRARY, NavigationStackReducer.back(playlist)?.last()?.tab)
-        assertEquals(home, NavigationStackReducer.back(NavigationStackReducer.openPlaylist(home, 42L))?.dropLast(0)?.let { listOf(it.first()) })
+        val homePlaylist = NavigationStackReducer.openPlaylist(home, 42L)
+        assertEquals(home, NavigationStackReducer.back(homePlaylist))
     }
 
     @Test
