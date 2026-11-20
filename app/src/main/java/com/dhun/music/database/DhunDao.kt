@@ -23,6 +23,13 @@ interface DhunDao {
     @Query("DELETE FROM cached_songs")
     suspend fun clearScannedSongs()
 
+    @Transaction
+    suspend fun replaceScannedSongs(songs: List<SongEntity>) {
+        require(songs.isNotEmpty()) { "Refusing to replace the library with an empty scan" }
+        clearScannedSongs()
+        insertSongs(songs)
+    }
+
     // --- Favorites ---
     @Query("SELECT * FROM favorites ORDER BY addedAt DESC")
     fun getAllFavorites(): Flow<List<FavoriteEntity>>
