@@ -125,7 +125,14 @@ fun DhunApp(viewModel: DhunViewModel) {
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        viewModel.rescanMusic()
+        val audioPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+        if (permissions.containsKey(audioPermission)) {
+            viewModel.rescanMusic()
+        }
     }
 
     LaunchedEffect(Unit) {
