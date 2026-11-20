@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.net.Uri
+import android.provider.Settings as AndroidSettings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -24,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -32,6 +35,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
 import com.dhun.music.model.Playlist
@@ -84,6 +90,7 @@ fun DhunApp(viewModel: DhunViewModel) {
     val artists by viewModel.artists.collectAsState()
     val folders by viewModel.folders.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
+    val scanMessage by viewModel.scanMessage.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
     val showNowPlaying by viewModel.showNowPlaying.collectAsState()
@@ -94,6 +101,16 @@ fun DhunApp(viewModel: DhunViewModel) {
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var songForAddToPlaylist by remember { mutableStateOf<Song?>(null) }
     var songForDetails by remember { mutableStateOf<Song?>(null) }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.checkForLibraryChanges()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
 
     BackHandler {
         when {
@@ -254,7 +271,14 @@ fun DhunApp(viewModel: DhunViewModel) {
                             SettingsScreen(
                                 isScanning = isScanning,
                                 onRescanLibrary = { filterShort -> viewModel.rescanMusic(filterShort) },
-                                totalSongCount = allSongs.size
+                                totalSongCount = allSongs.size,
+                                scanMessage = scanMessage,
+                                onOpenAppSettings = {
+                                    val intent = Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                        data = Uri.fromParts("package", context.packageName, null)
+                                    }
+                                    context.startActivity(intent)
+                                }
                             )
                         }
                     }
