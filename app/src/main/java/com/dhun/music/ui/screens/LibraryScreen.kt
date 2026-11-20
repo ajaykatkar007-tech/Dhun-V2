@@ -1,6 +1,8 @@
 package com.dhun.music.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,10 +49,11 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,6 +84,7 @@ import com.dhun.music.ui.theme.DhunSurface
 import com.dhun.music.ui.theme.DhunTextSecondary
 import com.dhun.music.ui.theme.DhunViolet
 import com.dhun.music.ui.theme.DhunVioletDark
+import kotlinx.coroutines.launch
 
 enum class LibraryTab(val titleRes: Int) {
     SONGS(R.string.tab_songs),
@@ -118,7 +122,9 @@ fun LibraryScreen(
     onDeletePlaylist: (Playlist) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    val pagerState = rememberPagerState(pageCount = { LibraryTab.entries.size })
+    val selectedTabIndex = pagerState.currentPage
+    val coroutineScope = rememberCoroutineScope()
     var sortOption by remember { mutableStateOf(SongSortOption.TITLE_ASC) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
 
@@ -207,7 +213,7 @@ fun LibraryScreen(
                 LibraryTab.entries.forEachIndexed { index, tab ->
                     Tab(
                         selected = selectedTabIndex == index,
-                        onClick = { selectedTabIndex = index },
+                        onClick = { coroutineScope.launch { pagerState.animateScrollToPage(index) } },
                         text = {
                             Text(
                                 text = stringResource(tab.titleRes),
@@ -220,8 +226,13 @@ fun LibraryScreen(
                 }
             }
 
-            // Tab Content
-            when (LibraryTab.entries[selectedTabIndex]) {
+            // Swipeable tab content. The pager keeps the tab row and visible page in sync.
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                beyondViewportPageCount = 0
+            ) { page ->
+                when (LibraryTab.entries[page]) {
                 LibraryTab.SONGS -> {
                     if (sortedSongs.isEmpty()) {
                         DhunEmptyState(
@@ -415,6 +426,7 @@ fun LibraryScreen(
                             }
                         }
                     }
+                }
                 }
             }
         }
