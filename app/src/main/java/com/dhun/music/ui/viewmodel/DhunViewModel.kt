@@ -10,6 +10,7 @@ import com.dhun.music.model.Folder
 import com.dhun.music.model.PlaybackInfo
 import com.dhun.music.model.Playlist
 import com.dhun.music.model.Song
+import com.dhun.music.scanner.MusicScanResult
 import com.dhun.music.ui.components.DhunNavTab
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -49,6 +50,8 @@ class DhunViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
 
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
+    private val _scanMessage = MutableStateFlow<String?>(null)
+    val scanMessage: StateFlow<String?> = _scanMessage.asStateFlow()
 
     val selectedTab = MutableStateFlow(DhunNavTab.HOME)
     val searchQuery = MutableStateFlow("")
@@ -259,12 +262,38 @@ class DhunViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
     fun getPlaylistSongs(playlistId: Long) = repository.getPlaylistSongs(playlistId)
 
     fun rescanMusic(ignoreShortAudio: Boolean = true) {
+        if (_isScanning.value) return
         viewModelScope.launch {
             _isScanning.value = true
+            _scanMessage.value = "Scanning your music library…"
             try {
-                repository.rescanMusic(ignoreShortAudio)
+                val report = repository.rescanMusic(ignoreShortAudio)
+                _scanMessage.value = when (val result = report.result) {
+                    is MusicScanResult.Success -> if (report.newlyFoundCount > 0) {
+                        "Scan complete • ${report.newlyFoundCount} new track(s) found"
+                    } else {
+                        "Scan complete • No new MP3 found"
+                    }
+                    is MusicScanResult.PartialSuccess ->
+                        "Partial scan • ${report.newlyFoundCount} new track(s) found; ${result.skippedCount} item(s) could not be read"
+                    is MusicScanResult.Empty -> "No new MP3 found • Your existing library was preserved"
+                    MusicScanResult.PermissionDenied -> "Storage permission required. Open app settings to allow audio access."
+                    is MusicScanResult.Failed -> "Scan failed • ${result.reason}. Your existing library was preserved"
+                    MusicScanResult.Cancelled -> "Scan cancelled • Your existing library was preserved"
+                }
+            } catch (error: Exception) {
+                _scanMessage.value = "Scan failed • ${error.message ?: "Unknown error"}. Your existing library was preserved"
             } finally {
                 _isScanning.value = false
+            }
+        }
+    }
+
+    fun checkForLibraryChanges() {
+        if (_isScanning.value) return
+        viewModelScope.launch {
+            if (repository.hasPotentialLibraryChanges()) {
+                _scanMessage.value = "New audio may be available • Tap Scan to refresh"
             }
         }
     }
