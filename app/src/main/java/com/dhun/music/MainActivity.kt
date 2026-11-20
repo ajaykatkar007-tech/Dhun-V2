@@ -230,7 +230,9 @@ fun DhunApp(viewModel: DhunViewModel) {
                                 onSongClick = { song, queue -> viewModel.playSong(song, queue) },
                                 onOpenLibraryTab = { tab -> viewModel.selectTab(tab) },
                                 onOpenSettings = { viewModel.selectTab(DhunNavTab.SETTINGS) },
-                                onSelectPlaylist = { playlist -> viewModel.openPlaylist(playlist) }
+                                onSelectPlaylist = { playlist -> viewModel.openPlaylist(playlist) },
+                                isRefreshing = isScanning,
+                                onRefresh = { viewModel.rescanMusic() }
                             )
                         }
                         DhunNavTab.SEARCH -> {

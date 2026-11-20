@@ -1,5 +1,6 @@
 package com.dhun.music.ui.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -33,23 +35,44 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PullToRefreshBox
+import androidx.compose.material3.PullToRefreshState
+import androidx.compose.material3.rememberPullToRefreshState
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.graphicsLayer
 import com.dhun.music.R
 import com.dhun.music.model.PlaybackInfo
 import com.dhun.music.model.Playlist
@@ -83,7 +106,9 @@ fun HomeScreen(
     onOpenLibraryTab: (DhunNavTab) -> Unit,
     onOpenSettings: () -> Unit,
     onSelectPlaylist: (Playlist) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isRefreshing: Boolean = false,
+    onRefresh: () -> Unit = {}
 ) {
     val greeting = remember {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
@@ -103,12 +128,21 @@ fun HomeScreen(
         allSongs.sortedByDescending { it.dateAdded }.take(8)
     }
 
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .testTag("home_screen"),
-        contentPadding = PaddingValues(bottom = 120.dp)
+    val pullToRefreshState = rememberPullToRefreshState()
+
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        state = pullToRefreshState,
+        modifier = modifier.fillMaxSize(),
+        indicator = { state -> DhunPullToRefreshIndicator(state = state, isRefreshing = isRefreshing) }
     ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag("home_screen"),
+            contentPadding = PaddingValues(bottom = 120.dp)
+        ) {
         // --- Dhun Branded Header & Greeting ---
         item {
             Column(
@@ -342,6 +376,73 @@ fun HomeScreen(
                 }
             }
         }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DhunPullToRefreshIndicator(
+    state: PullToRefreshState,
+    isRefreshing: Boolean
+) {
+    val pullProgress = state.distanceFraction.coerceIn(0f, 1f)
+    val scale by animateFloatAsState(
+        targetValue = if (isRefreshing) 1f else 0.78f + (pullProgress * 0.22f),
+        animationSpec = tween(durationMillis = 160),
+        label = "dhunRefreshScale"
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (isRefreshing) 1f else pullProgress.coerceIn(0.12f, 1f),
+        animationSpec = tween(durationMillis = 160),
+        label = "dhunRefreshAlpha"
+    )
+    val rotation by rememberInfiniteTransition(label = "dhunRefreshRotation").animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing)),
+        label = "dhunRefreshRotationAngle"
+    )
+    val accent = MaterialTheme.colorScheme.primary
+    val description = if (isRefreshing) "Refreshing music library" else "Pull to refresh music library"
+
+    Box(
+        modifier = Modifier
+            .align(Alignment.TopCenter)
+            .padding(top = (pullProgress * 52f).dp)
+            .size(48.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale; this.alpha = alpha }
+            .shadow(6.dp, CircleShape)
+            .background(MaterialTheme.colorScheme.surface, CircleShape)
+            .semantics {
+                contentDescription = description
+                stateDescription = if (isRefreshing) "Refresh in progress" else "Pull progress ${(pullProgress * 100).toInt()} percent"
+                progressBarRangeInfo = ProgressBarRangeInfo(pullProgress, 0f, 1f)
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.size(32.dp)) {
+            val strokeWidth = 2.6.dp.toPx()
+            drawCircle(
+                color = accent.copy(alpha = 0.18f),
+                style = Stroke(width = strokeWidth)
+            )
+            rotate(if (isRefreshing) rotation else -90f) {
+                drawArc(
+                    color = accent,
+                    startAngle = -90f,
+                    sweepAngle = if (isRefreshing) 285f else 285f * pullProgress,
+                    useCenter = false,
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                )
+            }
+        }
+        Icon(
+            imageVector = Icons.Filled.MusicNote,
+            contentDescription = null,
+            tint = accent,
+            modifier = Modifier.size(16.dp)
+        )
     }
 }
 
