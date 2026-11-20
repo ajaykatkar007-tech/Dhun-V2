@@ -26,7 +26,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [35])
 class ExampleRobolectricTest {
 
   private lateinit var db: DhunDatabase
@@ -111,6 +111,39 @@ class ExampleRobolectricTest {
 
     val all = dao.getAllSongs().first()
     assertEquals(1, all.size)
+  }
+
+
+  @Test
+  fun emptyReplacementDoesNotDeleteExistingLibrary() = runBlocking {
+    val original = SongEntity(
+      id = 501L,
+      title = "Existing Track",
+      artist = "Dhun",
+      album = "Library",
+      durationMs = 120000L,
+      contentUri = "content://audio/501",
+      albumArtUri = null,
+      folder = "Music",
+      dateAdded = 1L
+    )
+    dao.insertSongs(listOf(original))
+
+    try {
+      dao.replaceScannedSongs(emptyList())
+    } catch (_: IllegalArgumentException) {
+      // Empty replacement is deliberately rejected before deletion.
+    }
+
+    val preserved = dao.getAllSongs().first()
+    assertEquals(1, preserved.size)
+    assertEquals(501L, preserved.first().id)
+
+    val replacement = original.copy(id = 502L, title = "New Track")
+    dao.replaceScannedSongs(listOf(replacement))
+    val replaced = dao.getAllSongs().first()
+    assertEquals(1, replaced.size)
+    assertEquals(502L, replaced.first().id)
   }
 
   @Test
