@@ -402,9 +402,6 @@ fun HomeScreen(
             }
         }
         }
-    }
-}
-
             if (pullDistance.floatValue > 0f || isRefreshing) {
                 val progress = (pullDistance.floatValue / refreshThreshold).coerceIn(0f, 1f)
                 Box(
