@@ -404,19 +404,21 @@ fun HomeScreen(
         }
             if (pullDistance.floatValue > 0f || isRefreshing) {
                 val progress = (pullDistance.floatValue / refreshThreshold).coerceIn(0f, 1f)
+                val primaryColor = MaterialTheme.colorScheme.primary
+                val surfaceColor = MaterialTheme.colorScheme.surface
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = with(density) { (pullDistance.floatValue - 48.dp.toPx()).coerceAtLeast(0f).toDp() })
                         .size(48.dp)
-                        .background(MaterialTheme.colorScheme.surface, CircleShape),
+                        .background(surfaceColor, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Canvas(modifier = Modifier.size(32.dp)) {
                         val stroke = 2.6.dp.toPx()
-                        drawCircle(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f), style = Stroke(width = stroke))
+                        drawCircle(color = primaryColor.copy(alpha = 0.18f), style = Stroke(width = stroke))
                         drawArc(
-                            color = MaterialTheme.colorScheme.primary,
+                            color = primaryColor,
                             startAngle = -90f,
                             sweepAngle = 285f * progress,
                             useCenter = false,
@@ -426,7 +428,7 @@ fun HomeScreen(
                     Icon(
                         imageVector = Icons.Filled.MusicNote,
                         contentDescription = if (isRefreshing) "Refreshing music library" else "Pull to refresh music library",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = primaryColor,
                         modifier = Modifier.size(16.dp)
                     )
                 }
