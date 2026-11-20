@@ -152,6 +152,12 @@ class MusicRepository(
         }
     }
 
+
+    suspend fun hasPotentialLibraryChanges(): Boolean = withContext(Dispatchers.IO) {
+        val mediaStoreCount = MediaScanner.countDeviceAudioItems(context) ?: return@withContext false
+        mediaStoreCount > dao.getCachedSongCount()
+    }
+
     suspend fun toggleFavorite(songId: Long) = withContext(Dispatchers.IO) {
         val isFav = dao.isFavorite(songId).first()
         if (isFav) {
