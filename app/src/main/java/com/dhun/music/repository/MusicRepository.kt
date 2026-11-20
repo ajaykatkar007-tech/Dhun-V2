@@ -13,6 +13,8 @@ import com.dhun.music.model.Folder
 import com.dhun.music.model.Playlist
 import com.dhun.music.model.Song
 import com.dhun.music.scanner.MediaScanner
+import com.dhun.music.scanner.MusicScanReport
+import com.dhun.music.scanner.MusicScanResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -110,27 +112,44 @@ class MusicRepository(
             .sortedBy { it.name.lowercase() }
     }
 
-    suspend fun rescanMusic(ignoreShortAudio: Boolean = true) = withContext(Dispatchers.IO) {
+    suspend fun rescanMusic(ignoreShortAudio: Boolean = true): MusicScanReport = withContext(Dispatchers.IO) {
         val minDuration = if (ignoreShortAudio) 30_000L else 5_000L
-        val scanned = MediaScanner.scanDeviceAudio(context, minDuration)
+        val existingIds = dao.getAllSongs().first().map { it.id }.toSet()
+        val scanResult = MediaScanner.scanDeviceAudio(context, minDuration)
 
-        val entities = scanned.map { song ->
-            SongEntity(
-                id = song.id,
-                title = song.title,
-                artist = song.artist,
-                album = song.album,
-                durationMs = song.durationMs,
-                contentUri = song.contentUri,
-                albumArtUri = song.albumArtUri,
-                folder = song.folder,
-                dateAdded = song.dateAdded,
-                isLocalSample = song.isLocalSample
-            )
+        fun toEntity(song: Song) = SongEntity(
+            id = song.id,
+            title = song.title,
+            artist = song.artist,
+            album = song.album,
+            durationMs = song.durationMs,
+            contentUri = song.contentUri,
+            albumArtUri = song.albumArtUri,
+            folder = song.folder,
+            dateAdded = song.dateAdded,
+            isLocalSample = song.isLocalSample
+        )
+
+        when (scanResult) {
+            is MusicScanResult.Success -> {
+                val unique = scanResult.songs.distinctBy { it.id }.distinctBy { it.contentUri }
+                if (unique.isEmpty()) return@withContext MusicScanReport(MusicScanResult.Empty())
+                dao.replaceScannedSongs(unique.map(::toEntity))
+                MusicScanReport(MusicScanResult.Success(unique), unique.count { it.id !in existingIds })
+            }
+            is MusicScanResult.PartialSuccess -> {
+                val unique = scanResult.songs.distinctBy { it.id }.distinctBy { it.contentUri }
+                if (unique.isNotEmpty()) dao.insertSongs(unique.map(::toEntity))
+                MusicScanReport(
+                    MusicScanResult.PartialSuccess(unique, scanResult.skippedCount),
+                    unique.count { it.id !in existingIds }
+                )
+            }
+            is MusicScanResult.Empty,
+            is MusicScanResult.PermissionDenied,
+            is MusicScanResult.Failed,
+            is MusicScanResult.Cancelled -> MusicScanReport(scanResult)
         }
-
-        dao.clearScannedSongs()
-        dao.insertSongs(entities)
     }
 
     suspend fun toggleFavorite(songId: Long) = withContext(Dispatchers.IO) {
