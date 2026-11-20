@@ -63,7 +63,7 @@ class DhunViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
     private val navigationKey = "dhun_navigation_stack"
     private val _navigationStack = MutableStateFlow(
         (savedStateHandle.get<ArrayList<String>>(navigationKey) ?: arrayListOf("HOME|-|ROOT"))
-            .mapNotNull(NavigationEntry::decode)
+            .mapNotNull { NavigationEntry.decode(it) }
             .ifEmpty { listOf(NavigationEntry(DhunNavTab.HOME)) }
     )
 
