@@ -24,6 +24,25 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.Collections
 
+/**
+ * Calculates a safe relative seek target. If duration is unknown, retain the
+ * current position rather than risk seeking outside the media player's range.
+ */
+internal fun calculateSeekPositionMs(
+    currentPositionMs: Long,
+    durationMs: Long,
+    offsetMs: Long
+): Long {
+    val current = currentPositionMs.coerceAtLeast(0L)
+    if (durationMs <= 0L) return current
+    val target = when {
+        offsetMs > 0L && current > Long.MAX_VALUE - offsetMs -> Long.MAX_VALUE
+        offsetMs < 0L && current < Long.MIN_VALUE - offsetMs -> Long.MIN_VALUE
+        else -> current + offsetMs
+    }
+    return target.coerceIn(0L, durationMs)
+}
+
 class AudioPlaybackManager private constructor(private val appContext: Context) {
 
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -281,12 +300,39 @@ class AudioPlaybackManager private constructor(private val appContext: Context) 
     }
 
     fun seekTo(positionMs: Long) {
-        mediaPlayer?.let { player ->
-            val safePos = positionMs.coerceIn(0L, player.duration.toLong().coerceAtLeast(1L))
-            player.seekTo(safePos.toInt())
-            _playbackInfo.update { it.copy(currentPositionMs = safePos) }
+        val player = mediaPlayer ?: return
+        val info = _playbackInfo.value
+        val durationMs = runCatching { player.duration.toLong() }.getOrDefault(0L)
+            .takeIf { it > 0L } ?: info.durationMs
+        if (durationMs <= 0L) return
+
+        val safePosition = positionMs.coerceIn(0L, durationMs)
+        runCatching {
+            player.seekTo(safePosition.toInt())
+            _playbackInfo.update { it.copy(currentPositionMs = safePosition) }
         }
     }
+
+    private fun seekBy(offsetMs: Long) {
+        val player = mediaPlayer ?: return
+        val info = _playbackInfo.value
+        val playerDuration = runCatching { player.duration.toLong() }.getOrDefault(0L)
+        val durationMs = playerDuration.takeIf { it > 0L } ?: info.durationMs
+        if (durationMs <= 0L) return
+
+        val playerPosition = runCatching { player.currentPosition.toLong() }
+            .getOrDefault(info.currentPositionMs)
+        val targetPosition = calculateSeekPositionMs(playerPosition, durationMs, offsetMs)
+        runCatching {
+            player.seekTo(targetPosition.toInt())
+            _playbackInfo.update { it.copy(currentPositionMs = targetPosition) }
+        }
+    }
+
+    fun seekForward10Seconds() = seekBy(10_000L)
+    fun seekBackward10Seconds() = seekBy(-10_000L)
+    fun seekForward30Seconds() = seekBy(30_000L)
+    fun seekBackward30Seconds() = seekBy(-30_000L)
 
     fun toggleShuffle() {
         val newShuffle = !_playbackInfo.value.isShuffle
