@@ -42,6 +42,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
+import android.content.Context
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -63,9 +65,13 @@ fun SettingsScreen(
     isScanning: Boolean,
     onRescanLibrary: (Boolean) -> Unit,
     totalSongCount: Int,
+    scanMessage: String? = null,
+    onOpenAppSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var filterShortAudio by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+    val preferences = remember(context) { context.getSharedPreferences("dhun_settings", Context.MODE_PRIVATE) }
+    var filterShortAudio by remember { mutableStateOf(preferences.getBoolean("ignore_short_audio", true)) }
 
     LazyColumn(
         modifier = modifier
@@ -159,6 +165,7 @@ fun SettingsScreen(
                             checked = filterShortAudio,
                             onCheckedChange = {
                                 filterShortAudio = it
+                                preferences.edit().putBoolean("ignore_short_audio", it).apply()
                                 onRescanLibrary(it)
                             },
                             colors = SwitchDefaults.colors(
@@ -166,6 +173,19 @@ fun SettingsScreen(
                                 checkedTrackColor = DhunViolet
                             )
                         )
+                    }
+                    if (scanMessage != null) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = scanMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DhunTextSecondary
+                        )
+                        if (scanMessage.startsWith("Storage permission required")) {
+                            OutlinedButton(onClick = onOpenAppSettings) {
+                                Text("Open app settings")
+                            }
+                        }
                     }
                 }
             }
