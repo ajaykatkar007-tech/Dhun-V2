@@ -262,7 +262,7 @@ fun DhunApp(viewModel: DhunViewModel) {
                                 onAddToPlaylist = { song -> songForAddToPlaylist = song },
                                 onShowDetails = { song -> songForDetails = song },
                                 onShare = onShareSong,
-                                onSelectPlaylist = { playlist -> viewModel.activePlaylist.value = playlist },
+                                onSelectPlaylist = { playlist -> viewModel.openPlaylist(playlist) },
                                 onCreatePlaylist = { showCreatePlaylistDialog = true },
                                 onDeletePlaylist = { playlist -> viewModel.deletePlaylist(playlist.id) }
                             )
