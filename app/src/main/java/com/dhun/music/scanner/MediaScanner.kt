@@ -15,13 +15,21 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
 
+
+internal fun isSupportedAudioFile(mimeType: String?, displayName: String?): Boolean {
+    val extension = displayName?.substringAfterLast('.', "")?.lowercase(Locale.ROOT)
+    val isMp3 = mimeType.equals("audio/mpeg", ignoreCase = true) || extension == "mp3"
+    return isMp3 ||
+        mimeType?.startsWith("audio/", ignoreCase = true) == true ||
+        extension?.let { it in setOf("m4a", "aac", "wav", "ogg", "oga", "flac", "opus", "3gp", "amr") } == true
+}
+
+internal fun passesDurationFilter(durationMs: Long, minDurationMs: Long): Boolean =
+    durationMs > 0L && durationMs >= minDurationMs
+
 object MediaScanner {
 
     private val ALBUM_ART_URI = Uri.parse("content://media/external/audio/albumart")
-    private val SUPPORTED_AUDIO_EXTENSIONS = setOf(
-        "mp3", "m4a", "aac", "wav", "ogg", "oga", "flac", "opus", "3gp", "amr"
-    )
-
     suspend fun scanDeviceAudio(
         context: Context,
         minDurationMs: Long = 30_000L
@@ -75,7 +83,7 @@ object MediaScanner {
                     try {
                         val id = it.getLong(idColumn)
                         val duration = it.getLong(durationColumn)
-                        if (id <= 0L || duration < minDurationMs || duration <= 0L) continue
+                        if (id <= 0L || !passesDurationFilter(duration, minDurationMs)) continue
 
                         val contentUri = ContentUris.withAppendedId(collection, id)
                         val filePath = dataColumn.takeIf { column -> column >= 0 }
@@ -86,15 +94,7 @@ object MediaScanner {
                             ?.let(it::getString)
                         val mimeType = mimeFromCursor
                             ?: context.contentResolver.getType(contentUri)
-                        val extension = displayName
-                            ?.substringAfterLast('.', "")
-                            ?.lowercase(Locale.ROOT)
-                        val isMp3 = mimeType.equals("audio/mpeg", ignoreCase = true) ||
-                            extension == "mp3"
-                        val isOtherSupportedAudio = mimeType?.startsWith("audio/", ignoreCase = true) == true ||
-                            extension?.let { it in SUPPORTED_AUDIO_EXTENSIONS } == true
-
-                        if (!isMp3 && !isOtherSupportedAudio) continue
+                        if (!isSupportedAudioFile(mimeType, displayName)) continue
 
                         // Verify that the MediaStore URI can actually be opened before caching it.
                         val accessible = context.contentResolver.openAssetFileDescriptor(contentUri, "r")
