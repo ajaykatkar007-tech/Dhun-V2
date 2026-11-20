@@ -14,6 +14,9 @@ interface DhunDao {
     @Query("SELECT * FROM cached_songs ORDER BY title COLLATE NOCASE ASC")
     fun getAllSongs(): Flow<List<SongEntity>>
 
+    @Query("SELECT COUNT(*) FROM cached_songs")
+    suspend fun getCachedSongCount(): Int
+
     @Query("SELECT * FROM cached_songs WHERE id = :songId LIMIT 1")
     suspend fun getSongById(songId: Long): SongEntity?
 
