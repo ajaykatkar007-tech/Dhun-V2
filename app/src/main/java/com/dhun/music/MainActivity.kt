@@ -1,6 +1,7 @@
 package com.dhun.music
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -8,6 +9,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -93,6 +95,15 @@ fun DhunApp(viewModel: DhunViewModel) {
     var songForAddToPlaylist by remember { mutableStateOf<Song?>(null) }
     var songForDetails by remember { mutableStateOf<Song?>(null) }
 
+    BackHandler {
+        when {
+            songForDetails != null -> songForDetails = null
+            songForAddToPlaylist != null -> songForAddToPlaylist = null
+            showCreatePlaylistDialog -> showCreatePlaylistDialog = false
+            !viewModel.navigateBack() -> (context as? Activity)?.finish()
+        }
+    }
+
     // Permission request launcher
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -148,7 +159,7 @@ fun DhunApp(viewModel: DhunViewModel) {
                     if (playbackInfo.currentSong != null && !showNowPlaying) {
                         MiniPlayer(
                             playbackInfo = playbackInfo,
-                            onOpenNowPlaying = { viewModel.showNowPlaying.value = true },
+                            onOpenNowPlaying = { viewModel.openNowPlaying() },
                             onPlayPause = { viewModel.playOrPause() },
                             onNext = { viewModel.next() }
                         )
@@ -157,8 +168,7 @@ fun DhunApp(viewModel: DhunViewModel) {
                     DhunBottomNav(
                         selectedTab = selectedTab,
                         onTabSelected = { tab ->
-                            viewModel.activePlaylist.value = null
-                            viewModel.selectedTab.value = tab
+                            viewModel.selectTab(tab)
                         }
                     )
                 }
@@ -177,7 +187,7 @@ fun DhunApp(viewModel: DhunViewModel) {
                         playlist = playlist,
                         songs = playlistSongs,
                         playbackInfo = playbackInfo,
-                        onBack = { viewModel.activePlaylist.value = null },
+                        onBack = { viewModel.navigateBack() },
                         onSongClick = { song, queue -> viewModel.playSong(song, queue) },
                         onToggleFavorite = { song -> viewModel.toggleFavorite(song) },
                         onAddToQueue = { song -> viewModel.addToQueue(song) },
@@ -198,9 +208,9 @@ fun DhunApp(viewModel: DhunViewModel) {
                                 playlists = playlists,
                                 playbackInfo = playbackInfo,
                                 onSongClick = { song, queue -> viewModel.playSong(song, queue) },
-                                onOpenLibraryTab = { tab -> viewModel.selectedTab.value = tab },
-                                onOpenSettings = { viewModel.selectedTab.value = DhunNavTab.SETTINGS },
-                                onSelectPlaylist = { playlist -> viewModel.activePlaylist.value = playlist }
+                                onOpenLibraryTab = { tab -> viewModel.selectTab(tab) },
+                                onOpenSettings = { viewModel.selectTab(DhunNavTab.SETTINGS) },
+                                onSelectPlaylist = { playlist -> viewModel.openPlaylist(playlist) }
                             )
                         }
                         DhunNavTab.SEARCH -> {
@@ -260,7 +270,7 @@ fun DhunApp(viewModel: DhunViewModel) {
         ) {
             NowPlayingScreen(
                 playbackInfo = playbackInfo,
-                onCollapse = { viewModel.showNowPlaying.value = false },
+                onCollapse = { viewModel.navigateBack() },
                 onPlayPause = { viewModel.playOrPause() },
                 onNext = { viewModel.next() },
                 onPrevious = { viewModel.previous() },
@@ -268,7 +278,7 @@ fun DhunApp(viewModel: DhunViewModel) {
                 onToggleShuffle = { viewModel.toggleShuffle() },
                 onToggleRepeat = { viewModel.toggleRepeat() },
                 onToggleFavorite = { song -> viewModel.toggleFavorite(song) },
-                onOpenQueue = { viewModel.showQueue.value = true }
+                onOpenQueue = { viewModel.openQueue() }
             )
         }
 
@@ -280,7 +290,7 @@ fun DhunApp(viewModel: DhunViewModel) {
         ) {
             QueueScreen(
                 playbackInfo = playbackInfo,
-                onBack = { viewModel.showQueue.value = false },
+                onBack = { viewModel.navigateBack() },
                 onSongClick = { song -> viewModel.playSong(song) },
                 onRemoveFromQueue = { index -> viewModel.removeFromQueue(index) },
                 onClearQueue = { viewModel.clearQueue() }
