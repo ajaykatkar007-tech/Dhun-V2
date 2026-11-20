@@ -60,24 +60,6 @@ class DhunViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
     val showQueue = MutableStateFlow(false)
     val activePlaylist = MutableStateFlow<Playlist?>(null)
 
-    private data class NavigationEntry(
-        val tab: DhunNavTab,
-        val playlistId: Long? = null,
-        val overlay: String = "ROOT"
-    ) {
-        fun encode(): String = "${tab.name}|${playlistId ?: "-"}|$overlay"
-
-        companion object {
-            fun decode(value: String): NavigationEntry? {
-                val parts = value.split("|")
-                if (parts.size != 3) return null
-                val tab = runCatching { DhunNavTab.valueOf(parts[0]) }.getOrNull() ?: return null
-                val playlistId = parts[1].takeIf { it != "-" }?.toLongOrNull()
-                return NavigationEntry(tab, playlistId, parts[2])
-            }
-        }
-    }
-
     private val navigationKey = "dhun_navigation_stack"
     private val _navigationStack = MutableStateFlow(
         (savedStateHandle.get<ArrayList<String>>(navigationKey) ?: arrayListOf("HOME|-|ROOT"))
@@ -98,49 +80,35 @@ class DhunViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
     }
 
     fun selectTab(tab: DhunNavTab) {
-        _navigationStack.value = listOf(NavigationEntry(tab))
+        _navigationStack.value = NavigationStackReducer.selectTab(tab)
         persistNavigation()
         syncLegacyNavigationState()
     }
 
     fun openPlaylist(playlist: Playlist) {
-        val current = _navigationStack.value.lastOrNull() ?: NavigationEntry(selectedTab.value)
-        _navigationStack.value = _navigationStack.value.dropLast(1) +
-            current.copy(overlay = "ROOT") +
-            NavigationEntry(current.tab, playlist.id, "ROOT")
+        _navigationStack.value = NavigationStackReducer.openPlaylist(_navigationStack.value, playlist.id)
         persistNavigation()
         syncLegacyNavigationState()
     }
 
     fun openQueue() {
-        val current = _navigationStack.value.lastOrNull() ?: NavigationEntry(selectedTab.value)
-        if (current.overlay == "QUEUE") return
-        _navigationStack.value = _navigationStack.value + current.copy(overlay = "QUEUE")
+        _navigationStack.value = NavigationStackReducer.pushOverlay(_navigationStack.value, "QUEUE")
         persistNavigation()
         syncLegacyNavigationState()
     }
 
     fun openNowPlaying() {
-        val current = _navigationStack.value.lastOrNull() ?: NavigationEntry(selectedTab.value)
-        if (current.overlay == "PLAYER") return
-        _navigationStack.value = _navigationStack.value + current.copy(overlay = "PLAYER")
+        _navigationStack.value = NavigationStackReducer.pushOverlay(_navigationStack.value, "PLAYER")
         persistNavigation()
         syncLegacyNavigationState()
     }
 
     fun navigateBack(): Boolean {
-        if (_navigationStack.value.size > 1) {
-            _navigationStack.value = _navigationStack.value.dropLast(1)
-            persistNavigation()
-            syncLegacyNavigationState()
-            return true
-        }
-        val currentTab = _navigationStack.value.lastOrNull()?.tab ?: DhunNavTab.HOME
-        if (currentTab != DhunNavTab.HOME) {
-            selectTab(DhunNavTab.HOME)
-            return true
-        }
-        return false
+        val previous = NavigationStackReducer.back(_navigationStack.value) ?: return false
+        _navigationStack.value = previous
+        persistNavigation()
+        syncLegacyNavigationState()
+        return true
     }
 
     init {
