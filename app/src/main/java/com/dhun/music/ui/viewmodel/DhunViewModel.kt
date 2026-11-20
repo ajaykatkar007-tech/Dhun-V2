@@ -1,5 +1,6 @@
 package com.dhun.music.ui.viewmodel
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhun.music.DhunApplication
@@ -18,7 +19,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class DhunViewModel : ViewModel() {
+class DhunViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel() {
 
     private val repository = DhunApplication.instance.repository
     private val playbackManager = DhunApplication.instance.playbackManager
@@ -56,7 +57,87 @@ class DhunViewModel : ViewModel() {
     val showQueue = MutableStateFlow(false)
     val activePlaylist = MutableStateFlow<Playlist?>(null)
 
+    private data class NavigationEntry(
+        val tab: DhunNavTab,
+        val playlistId: Long? = null,
+        val overlay: String = "ROOT"
+    ) {
+        fun encode(): String = "${tab.name}|${playlistId ?: "-"}|$overlay"
+
+        companion object {
+            fun decode(value: String): NavigationEntry? {
+                val parts = value.split("|")
+                if (parts.size != 3) return null
+                val tab = runCatching { DhunNavTab.valueOf(parts[0]) }.getOrNull() ?: return null
+                val playlistId = parts[1].takeIf { it != "-" }?.toLongOrNull()
+                return NavigationEntry(tab, playlistId, parts[2])
+            }
+        }
+    }
+
+    private val navigationKey = "dhun_navigation_stack"
+    private val _navigationStack = MutableStateFlow(
+        (savedStateHandle.get<ArrayList<String>>(navigationKey) ?: arrayListOf("HOME|-|ROOT"))
+            .mapNotNull(NavigationEntry::decode)
+            .ifEmpty { listOf(NavigationEntry(DhunNavTab.HOME)) }
+    )
+
+    private fun persistNavigation() {
+        savedStateHandle[navigationKey] = ArrayList(_navigationStack.value.map { it.encode() })
+    }
+
+    private fun syncLegacyNavigationState() {
+        val entry = _navigationStack.value.lastOrNull() ?: NavigationEntry(DhunNavTab.HOME)
+        selectedTab.value = entry.tab
+        showQueue.value = entry.overlay == "QUEUE"
+        showNowPlaying.value = entry.overlay == "PLAYER"
+        activePlaylist.value = entry.playlistId?.let { id -> playlists.value.firstOrNull { it.id == id } }
+    }
+
+    fun selectTab(tab: DhunNavTab) {
+        _navigationStack.value = listOf(NavigationEntry(tab))
+        persistNavigation()
+        syncLegacyNavigationState()
+    }
+
+    fun openPlaylist(playlist: Playlist) {
+        val current = _navigationStack.value.lastOrNull() ?: NavigationEntry(selectedTab.value)
+        _navigationStack.value = _navigationStack.value.dropLast(1) +
+            current.copy(overlay = "ROOT") +
+            NavigationEntry(current.tab, playlist.id, "ROOT")
+        persistNavigation()
+        syncLegacyNavigationState()
+    }
+
+    fun openQueue() {
+        val current = _navigationStack.value.lastOrNull() ?: NavigationEntry(selectedTab.value)
+        if (current.overlay == "QUEUE") return
+        _navigationStack.value = _navigationStack.value + current.copy(overlay = "QUEUE")
+        persistNavigation()
+        syncLegacyNavigationState()
+    }
+
+    fun openNowPlaying() {
+        val current = _navigationStack.value.lastOrNull() ?: NavigationEntry(selectedTab.value)
+        if (current.overlay == "PLAYER") return
+        _navigationStack.value = _navigationStack.value + current.copy(overlay = "PLAYER")
+        persistNavigation()
+        syncLegacyNavigationState()
+    }
+
+    fun navigateBack(): Boolean {
+        if (_navigationStack.value.size <= 1) return false
+        _navigationStack.value = _navigationStack.value.dropLast(1)
+        persistNavigation()
+        syncLegacyNavigationState()
+        return true
+    }
+
     init {
+        syncLegacyNavigationState()
+        viewModelScope.launch {
+            playlists.collect { syncLegacyNavigationState() }
+        }
         // Automatically synchronize favorites state with currently playing song and active queue
         viewModelScope.launch {
             repository.favoriteSongs.collect { favs ->
@@ -158,7 +239,7 @@ class DhunViewModel : ViewModel() {
         viewModelScope.launch {
             repository.deletePlaylist(playlistId)
             if (activePlaylist.value?.id == playlistId) {
-                activePlaylist.value = null
+                navigateBack()
             }
         }
     }
