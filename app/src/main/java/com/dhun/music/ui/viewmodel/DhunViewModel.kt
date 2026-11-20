@@ -170,6 +170,11 @@ class DhunViewModel(private val savedStateHandle: SavedStateHandle) : ViewModel(
         playbackManager.seekTo(positionMs)
     }
 
+    fun seekForward10Seconds() = playbackManager.seekForward10Seconds()
+    fun seekBackward10Seconds() = playbackManager.seekBackward10Seconds()
+    fun seekForward30Seconds() = playbackManager.seekForward30Seconds()
+    fun seekBackward30Seconds() = playbackManager.seekBackward30Seconds()
+
     fun toggleShuffle() {
         playbackManager.toggleShuffle()
     }

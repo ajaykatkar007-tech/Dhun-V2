@@ -1,5 +1,7 @@
 package com.dhun.music.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -26,6 +28,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -51,6 +55,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -76,6 +84,10 @@ fun NowPlayingScreen(
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onSeek: (Long) -> Unit,
+    onSeekForward10: () -> Unit,
+    onSeekBackward10: () -> Unit,
+    onSeekForward30: () -> Unit,
+    onSeekBackward30: () -> Unit,
     onToggleShuffle: () -> Unit,
     onToggleRepeat: () -> Unit,
     onToggleFavorite: (Song) -> Unit,
@@ -338,6 +350,30 @@ fun NowPlayingScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // --- Quick seek controls: tap for 10s, long-press for 30s ---
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SeekControlButton(
+                    label = "Backward 10 seconds",
+                    testTag = "seek_backward_10_button",
+                    imageVector = Icons.Default.Replay10,
+                    onClick = onSeekBackward10,
+                    onLongClick = onSeekBackward30
+                )
+                SeekControlButton(
+                    label = "Forward 10 seconds",
+                    testTag = "seek_forward_10_button",
+                    imageVector = Icons.Default.Forward10,
+                    onClick = onSeekForward10,
+                    onLongClick = onSeekForward30
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             // --- Primary Controls with Gradient Glow Play Button ---
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -466,5 +502,37 @@ fun NowPlayingScreen(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SeekControlButton(
+    label: String,
+    testTag: String,
+    imageVector: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(64.dp)
+            .clip(CircleShape)
+            .background(DhunViolet.copy(alpha = 0.12f))
+            .border(1.dp, DhunViolet.copy(alpha = 0.35f), CircleShape)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .semantics {
+                contentDescription = "$label. Long press to seek 30 seconds"
+                role = Role.Button
+            }
+            .testTag(testTag),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = "$label; long press for 30 seconds",
+            tint = DhunViolet,
+            modifier = Modifier.size(34.dp)
+        )
     }
 }
